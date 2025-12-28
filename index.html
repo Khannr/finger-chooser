@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#FF6B35">
+    <link rel="manifest" href="manifest.json">
+    <title>Finger Chooser</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+            background: linear-gradient(145deg, #FF8C42 0%, #FF6B35 50%, #F45D22 100%);
+            min-height: 100vh;
+            min-height: -webkit-fill-available;
+            display: flex;
+            flex-direction: column;
+            padding-top: env(safe-area-inset-top);
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            z-index: 100;
+        }
+
+        .title {
+            font-size: 20px;
+            font-weight: 600;
+            color: white;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+
+        .settings-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .settings-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .settings-btn svg {
+            width: 22px;
+            height: 22px;
+            fill: white;
+        }
+
+        /* Touch Area */
+        .touch-area {
+            flex: 1;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .instructions {
+            text-align: center;
+            color: white;
+            opacity: 0.9;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .instructions.hidden {
+            opacity: 0;
+        }
+
+        .instructions h2 {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .instructions p {
+            font-size: 16px;
+            opacity: 0.8;
+        }
+
+        /* Finger Circles */
+        .finger-circle {
+            position: absolute;
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            transition: transform 0.1s ease-out;
+        }
+
+        .finger-inner {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.95);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .finger-ring {
+            position: absolute;
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            border: 3px solid rgba(255,255,255,0.8);
+            animation: pulse 0.6s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                opacity: 0.8;
+            }
+            50% {
+                transform: scale(1.3);
+                opacity: 0.4;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 0.8;
+            }
+        }
+
+        /* Winner state */
+        .finger-circle.winner .finger-inner {
+            background: #4CAF50;
+            box-shadow: 0 0 30px rgba(76, 175, 80, 0.6);
+        }
+
+        .finger-circle.winner .finger-ring {
+            border-color: #4CAF50;
+            animation: winner-pulse 0.4s ease-in-out infinite;
+        }
+
+        @keyframes winner-pulse {
+            0%, 100% {
+                transform: scale(1.2);
+                opacity: 0.8;
+            }
+            50% {
+                transform: scale(1.5);
+                opacity: 0.3;
+            }
+        }
+
+        .finger-circle.loser .finger-inner {
+            background: rgba(255,255,255,0.4);
+        }
+
+        .finger-circle.loser .finger-ring {
+            opacity: 0.3;
+            animation: none;
+        }
+
+        /* Winner Count Display */
+        .winner-count {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255,255,255,0.2);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            padding: 12px 24px;
+            border-radius: 30px;
+            color: white;
+            font-size: 15px;
+            font-weight: 500;
+            z-index: 100;
+            padding-bottom: calc(12px + env(safe-area-inset-bottom));
+        }
+
+        /* Settings Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 200;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 20px;
+            padding: 24px;
+            width: 100%;
+            max-width: 320px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .modal h2 {
+            font-size: 22px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            text-align: center;
+            color: #333;
+        }
+
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .setting-row:last-child {
+            border-bottom: none;
+        }
+
+        .setting-label {
+            font-size: 16px;
+            color: #333;
+        }
+
+        .setting-control {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .stepper-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            background: #FF6B35;
+            color: white;
+            font-size: 20px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .stepper-btn:disabled {
+            background: #ddd;
+            cursor: not-allowed;
+        }
+
+        .stepper-value {
+            font-size: 18px;
+            font-weight: 600;
+            min-width: 24px;
+            text-align: center;
+            color: #333;
+        }
+
+        /* Toggle Switch */
+        .toggle {
+            width: 51px;
+            height: 31px;
+            background: #ddd;
+            border-radius: 16px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .toggle.active {
+            background: #4CAF50;
+        }
+
+        .toggle-knob {
+            width: 27px;
+            height: 27px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            transition: left 0.2s;
+        }
+
+        .toggle.active .toggle-knob {
+            left: 22px;
+        }
+
+        .close-modal {
+            width: 100%;
+            padding: 14px;
+            background: #FF6B35;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 16px;
+        }
+
+        /* Countdown overlay */
+        .countdown-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.3);
+            z-index: 150;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+
+        .countdown-overlay.show {
+            display: flex;
+        }
+
+        .countdown-number {
+            font-size: 120px;
+            font-weight: 700;
+            color: white;
+            text-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            animation: countdown-pop 0.5s ease-out;
+        }
+
+        @keyframes countdown-pop {
+            0% {
+                transform: scale(1.5);
+                opacity: 0;
+            }
+            50% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(0.9);
+                opacity: 0.8;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="title">Finger Chooser</div>
+        <button class="settings-btn" id="settingsBtn">
+            <svg viewBox="0 0 24 24">
+                <path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+            </svg>
+        </button>
+    </div>
+
+    <div class="touch-area" id="touchArea">
+        <div class="instructions" id="instructions">
+            <h2>Place Fingers</h2>
+            <p>Everyone touch the screen</p>
+        </div>
+    </div>
+
+    <div class="winner-count" id="winnerCount">
+        Winners: 1
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal">
+            <h2>Settings</h2>
+
+            <div class="setting-row">
+                <span class="setting-label">Number of Winners</span>
+                <div class="setting-control">
+                    <button class="stepper-btn" id="winnersDown">−</button>
+                    <span class="stepper-value" id="winnersValue">1</span>
+                    <button class="stepper-btn" id="winnersUp">+</button>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <span class="setting-label">Vibration</span>
+                <div class="toggle active" id="vibrationToggle">
+                    <div class="toggle-knob"></div>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <span class="setting-label">Sound</span>
+                <div class="toggle active" id="soundToggle">
+                    <div class="toggle-knob"></div>
+                </div>
+            </div>
+
+            <button class="close-modal" id="closeSettings">Done</button>
+        </div>
+    </div>
+
+    <div class="countdown-overlay" id="countdownOverlay">
+        <div class="countdown-number" id="countdownNumber">3</div>
+    </div>
+
+    <script>
+        // Settings
+        let numWinners = 1;
+        let vibrationEnabled = true;
+        let soundEnabled = true;
+
+        // State
+        let fingers = new Map();
+        let isSelecting = false;
+        let selectionTimeout = null;
+        let pulseInterval = null;
+
+        // DOM Elements
+        const touchArea = document.getElementById('touchArea');
+        const instructions = document.getElementById('instructions');
+        const winnerCountDisplay = document.getElementById('winnerCount');
+        const settingsModal = document.getElementById('settingsModal');
+        const settingsBtn = document.getElementById('settingsBtn');
+        const closeSettings = document.getElementById('closeSettings');
+        const winnersValue = document.getElementById('winnersValue');
+        const winnersUp = document.getElementById('winnersUp');
+        const winnersDown = document.getElementById('winnersDown');
+        const vibrationToggle = document.getElementById('vibrationToggle');
+        const soundToggle = document.getElementById('soundToggle');
+        const countdownOverlay = document.getElementById('countdownOverlay');
+        const countdownNumber = document.getElementById('countdownNumber');
+
+        // Haptic feedback
+        function vibrate(duration = 10) {
+            if (vibrationEnabled && navigator.vibrate) {
+                navigator.vibrate(duration);
+            }
+        }
+
+        // Sound
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playTone(frequency = 800, duration = 0.05) {
+            if (!soundEnabled) return;
+
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            oscillator.frequency.value = frequency;
+            oscillator.type = 'sine';
+
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + duration);
+        }
+
+        function playWinnerSound() {
+            if (!soundEnabled) return;
+            playTone(523, 0.1); // C5
+            setTimeout(() => playTone(659, 0.1), 100); // E5
+            setTimeout(() => playTone(784, 0.15), 200); // G5
+        }
+
+        // Create finger circle element
+        function createFingerCircle(id, x, y) {
+            const circle = document.createElement('div');
+            circle.className = 'finger-circle';
+            circle.id = `finger-${id}`;
+            circle.style.left = `${x}px`;
+            circle.style.top = `${y}px`;
+
+            circle.innerHTML = `
+                <div class="finger-ring"></div>
+                <div class="finger-inner"></div>
+            `;
+
+            touchArea.appendChild(circle);
+            return circle;
+        }
+
+        // Update finger position
+        function updateFingerPosition(id, x, y) {
+            const circle = document.getElementById(`finger-${id}`);
+            if (circle) {
+                circle.style.left = `${x}px`;
+                circle.style.top = `${y}px`;
+            }
+        }
+
+        // Remove finger circle
+        function removeFingerCircle(id) {
+            const circle = document.getElementById(`finger-${id}`);
+            if (circle) {
+                circle.remove();
+            }
+        }
+
+        // Start pulse vibration
+        function startPulseVibration() {
+            // Vibrate at each pulse apex (every 600ms, at 300ms offset for apex)
+            pulseInterval = setInterval(() => {
+                vibrate(10);
+            }, 600);
+            // Initial vibrate after 300ms (first apex)
+            setTimeout(() => vibrate(10), 300);
+        }
+
+        function stopPulseVibration() {
+            if (pulseInterval) {
+                clearInterval(pulseInterval);
+                pulseInterval = null;
+            }
+        }
+
+        // Select winners
+        function selectWinners() {
+            if (fingers.size < 2) return;
+
+            isSelecting = true;
+            stopPulseVibration();
+
+            // Get all finger IDs
+            const fingerIds = Array.from(fingers.keys());
+
+            // Randomly select winners
+            const shuffled = fingerIds.sort(() => Math.random() - 0.5);
+            const winners = shuffled.slice(0, Math.min(numWinners, fingerIds.length - 1));
+
+            // Mark winners and losers
+            fingerIds.forEach(id => {
+                const circle = document.getElementById(`finger-${id}`);
+                if (circle) {
+                    if (winners.includes(id)) {
+                        circle.classList.add('winner');
+                    } else {
+                        circle.classList.add('loser');
+                    }
+                }
+            });
+
+            // Play winner sound and strong vibration
+            playWinnerSound();
+            vibrate(200);
+        }
+
+        // Reset selection
+        function resetSelection() {
+            isSelecting = false;
+            stopPulseVibration();
+
+            if (selectionTimeout) {
+                clearTimeout(selectionTimeout);
+                selectionTimeout = null;
+            }
+
+            // Remove all finger circles
+            document.querySelectorAll('.finger-circle').forEach(el => el.remove());
+            fingers.clear();
+
+            instructions.classList.remove('hidden');
+        }
+
+        // Touch handlers
+        touchArea.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+
+            // Resume audio context on first touch
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+
+            if (isSelecting) {
+                resetSelection();
+                return;
+            }
+
+            for (let touch of e.changedTouches) {
+                if (fingers.size >= 5) break; // iOS limit
+
+                fingers.set(touch.identifier, { x: touch.clientX, y: touch.clientY });
+                createFingerCircle(touch.identifier, touch.clientX, touch.clientY);
+            }
+
+            // Hide instructions when fingers are placed
+            if (fingers.size > 0) {
+                instructions.classList.add('hidden');
+            }
+
+            // Start selection timer if 2+ fingers
+            if (fingers.size >= 2 && !selectionTimeout) {
+                startPulseVibration();
+                selectionTimeout = setTimeout(() => {
+                    selectWinners();
+                }, 2000);
+            }
+
+            updateWinnerCountDisplay();
+        }, { passive: false });
+
+        touchArea.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+
+            if (isSelecting) return;
+
+            for (let touch of e.changedTouches) {
+                if (fingers.has(touch.identifier)) {
+                    fingers.set(touch.identifier, { x: touch.clientX, y: touch.clientY });
+                    updateFingerPosition(touch.identifier, touch.clientX, touch.clientY);
+                }
+            }
+        }, { passive: false });
+
+        touchArea.addEventListener('touchend', (e) => {
+            e.preventDefault();
+
+            if (isSelecting) {
+                // On touch end after selection, reset
+                resetSelection();
+                return;
+            }
+
+            for (let touch of e.changedTouches) {
+                fingers.delete(touch.identifier);
+                removeFingerCircle(touch.identifier);
+            }
+
+            // Cancel selection if less than 2 fingers
+            if (fingers.size < 2) {
+                stopPulseVibration();
+                if (selectionTimeout) {
+                    clearTimeout(selectionTimeout);
+                    selectionTimeout = null;
+                }
+            }
+
+            // Show instructions if no fingers
+            if (fingers.size === 0) {
+                instructions.classList.remove('hidden');
+            }
+
+            updateWinnerCountDisplay();
+        }, { passive: false });
+
+        touchArea.addEventListener('touchcancel', (e) => {
+            e.preventDefault();
+            resetSelection();
+        }, { passive: false });
+
+        // Update winner count display
+        function updateWinnerCountDisplay() {
+            winnerCountDisplay.textContent = `Winners: ${numWinners}`;
+        }
+
+        // Settings handlers
+        settingsBtn.addEventListener('click', () => {
+            settingsModal.classList.add('show');
+        });
+
+        closeSettings.addEventListener('click', () => {
+            settingsModal.classList.remove('show');
+        });
+
+        settingsModal.addEventListener('click', (e) => {
+            if (e.target === settingsModal) {
+                settingsModal.classList.remove('show');
+            }
+        });
+
+        winnersUp.addEventListener('click', () => {
+            if (numWinners < 4) {
+                numWinners++;
+                winnersValue.textContent = numWinners;
+                updateWinnerCountDisplay();
+                vibrate(10);
+            }
+        });
+
+        winnersDown.addEventListener('click', () => {
+            if (numWinners > 1) {
+                numWinners--;
+                winnersValue.textContent = numWinners;
+                updateWinnerCountDisplay();
+                vibrate(10);
+            }
+        });
+
+        vibrationToggle.addEventListener('click', () => {
+            vibrationEnabled = !vibrationEnabled;
+            vibrationToggle.classList.toggle('active', vibrationEnabled);
+            if (vibrationEnabled) vibrate(10);
+        });
+
+        soundToggle.addEventListener('click', () => {
+            soundEnabled = !soundEnabled;
+            soundToggle.classList.toggle('active', soundEnabled);
+            if (soundEnabled) playTone(600, 0.05);
+        });
+
+        // Prevent zoom on double tap
+        document.addEventListener('dblclick', (e) => {
+            e.preventDefault();
+        }, { passive: false });
+
+        // Initialize
+        updateWinnerCountDisplay();
+    </script>
+</body>
+</html>
