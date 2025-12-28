@@ -134,7 +134,7 @@
             height: 90px;
             border-radius: 50%;
             border: 3px solid rgba(255,255,255,0.8);
-            animation: pulse 0.6s ease-in-out infinite;
+            animation: pulse 1.2s ease-in-out infinite;
         }
 
         @keyframes pulse {
@@ -495,13 +495,23 @@
             setTimeout(() => playTone(784, 0.15), 200); // G5
         }
 
+        // Get position relative to touch area
+        function getRelativePosition(clientX, clientY) {
+            const rect = touchArea.getBoundingClientRect();
+            return {
+                x: clientX - rect.left,
+                y: clientY - rect.top
+            };
+        }
+
         // Create finger circle element
-        function createFingerCircle(id, x, y) {
+        function createFingerCircle(id, clientX, clientY) {
+            const pos = getRelativePosition(clientX, clientY);
             const circle = document.createElement('div');
             circle.className = 'finger-circle';
             circle.id = `finger-${id}`;
-            circle.style.left = `${x}px`;
-            circle.style.top = `${y}px`;
+            circle.style.left = `${pos.x}px`;
+            circle.style.top = `${pos.y}px`;
 
             circle.innerHTML = `
                 <div class="finger-ring"></div>
@@ -513,11 +523,12 @@
         }
 
         // Update finger position
-        function updateFingerPosition(id, x, y) {
+        function updateFingerPosition(id, clientX, clientY) {
+            const pos = getRelativePosition(clientX, clientY);
             const circle = document.getElementById(`finger-${id}`);
             if (circle) {
-                circle.style.left = `${x}px`;
-                circle.style.top = `${y}px`;
+                circle.style.left = `${pos.x}px`;
+                circle.style.top = `${pos.y}px`;
             }
         }
 
@@ -531,12 +542,12 @@
 
         // Start pulse vibration
         function startPulseVibration() {
-            // Vibrate at each pulse apex (every 600ms, at 300ms offset for apex)
+            // Vibrate at each pulse apex (every 1200ms, at 600ms offset for apex)
             pulseInterval = setInterval(() => {
                 vibrate(10);
-            }, 600);
-            // Initial vibrate after 300ms (first apex)
-            setTimeout(() => vibrate(10), 300);
+            }, 1200);
+            // Initial vibrate after 600ms (first apex)
+            setTimeout(() => vibrate(10), 600);
         }
 
         function stopPulseVibration() {
